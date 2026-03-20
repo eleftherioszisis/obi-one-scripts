@@ -115,7 +115,7 @@ def run_cloud_task(*, task_type: str, config_id: str, subdomain: str, environmen
     ls_client = get_launch_system_client(project_context, "staging")
 
     data = obi_client.launch_task(
-        task_type="ion_channel_model_simulation", config_id=config_id
+        task_type=task_type, config_id=config_id
     )
 
     for dct in ls_client.stream_messages(data["job_id"]):

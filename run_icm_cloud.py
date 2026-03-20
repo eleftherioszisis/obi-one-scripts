@@ -13,10 +13,10 @@ L = logging.getLogger(__name__)
 
 subdomain = "cell_a"
 environment = "local"
-simulation_id = "6e390cd2-1cd8-4e4c-bee4-7f992ac82828"
+simulation_id = "65235f18-c18e-40e6-8c16-b1fdff9da6ce"
 
 run_cloud_task(
-    task_type="ion_channel_model_simulation",
+    task_type="ion_channel_model_simulation_execution",
     config_id=simulation_id,
     subdomain=subdomain,
     environment=environment,

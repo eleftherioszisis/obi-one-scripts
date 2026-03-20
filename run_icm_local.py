@@ -26,8 +26,9 @@ from obi_one.scientific.tasks.generate_simulations.config.ion_channel_models imp
 
 from obi_one.scientific.tasks.ion_channel_model_simulation import (
     IonChannelModelSimulationTask,
-    IonChannelModelSimulationExecutionConfig,
+    #IonChannelModelSimulationExecutionConfig,
 )
+from obi_one.core.run_tasks import run_task_type
 
 import obi_one as obi
 
@@ -91,7 +92,6 @@ sim_conf = IonChannelModelSimulationScanConfig(
             duration=100,
             initial_voltage=-80,
             step_voltage=0,
-            step_duration=40,
             neuron_set=None,
             timestamp_offset=20,
         )
@@ -148,7 +148,7 @@ client = Client(
     environment="staging",
     token_manager=access_token,
 )
-
+"""
 grid_scan = obi.GridScanGenerationTask(
     form=validated_sim_conf,
     coordinate_directory_option="ZERO_INDEX",
@@ -171,7 +171,10 @@ entity = (
     .generated[0]
 )
 # entity_id = '6e390cd2-1cd8-4e4c-bee4-7f992ac82828'
-entity_id = entity.id
+"""
+entity_id = "65235f18-c18e-40e6-8c16-b1fdff9da6ce"
+print(entity_id)
+
 single_config_entity = client.get_entity(
     entity_id=entity_id, entity_type=models.Simulation
 )
@@ -183,10 +186,12 @@ activity = create_activity(
     used=[single_config_entity],
 )
 
-
-config = IonChannelModelSimulationExecutionConfig(coordinate_output_root=output_root)
-config.single_entity = single_config_entity
-
-task = IonChannelModelSimulationTask(config=config)
-# task.execute(db_client=client, execution_activity_id=None)
-task.execute(db_client=client, execution_activity_id=activity.id)
+run_task_type(
+    task_type="ion_channel_model_simulation",
+    entity_type=models.Simulation,
+    entity_id=entity_id,
+    config_asset_id="dba4cbb6-7380-43d1-8567-fe3c928cd6f8",
+    scan_output_root="./out",
+    db_client=client,
+    execution_activity_id=str(activity.id),
+)
