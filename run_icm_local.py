@@ -24,8 +24,8 @@ from obi_one.scientific.tasks.generate_simulations.config.ion_channel_models imp
     IonChannelModelSimulationScanConfig,
 )
 
-from obi_one.scientific.tasks.ion_channel_model_simulation import (
-    IonChannelModelSimulationTask,
+from obi_one.scientific.tasks.ion_channel_model_simulation_execution import (
+    IonChannelModelSimulationExecutionTask,
     #IonChannelModelSimulationExecutionConfig,
 )
 from obi_one.core.run_tasks import run_task_type
@@ -87,31 +87,16 @@ sim_conf = IonChannelModelSimulationScanConfig(
         )
     },
     stimuli={
-        # do not use SEClamp for now
         "seclamp1": SEClampSomaticStimulus(
-            duration=100,
-            initial_voltage=-80,
-            step_voltage=0,
-            neuron_set=None,
-            timestamp_offset=20,
-        )
-        # "step1": ConstantCurrentClampSomaticStimulus(
-        #     duration=100,
-        #     neuron_set=None,
-        #     timestamp_offset=20,
-        #     amplitude=0.1,
-        # )
+                    level1_duration=50,
+                    level1_voltage=-80,
+                    level2_duration=100,
+                    level2_voltage=0,
+                    level3_duration=50,
+                    level3_voltage=-80,
+                )
     },
     recordings={
-        # do not use current recordings for now
-        # "rec1": IonChannelVariableRecording(
-        #     variable_name={
-        #         "variable": "ik",
-        #         "unit": "mA/cm2",
-        #     },
-        #     neuron_set=None,
-        #     dt=0.1,
-        # )
         "rec_voltage": SomaVoltageRecording(
             neuron_set=None,
             dt=0.1,
@@ -148,7 +133,7 @@ client = Client(
     environment="staging",
     token_manager=access_token,
 )
-"""
+
 grid_scan = obi.GridScanGenerationTask(
     form=validated_sim_conf,
     coordinate_directory_option="ZERO_INDEX",
@@ -170,9 +155,10 @@ entity = (
     .one()
     .generated[0]
 )
+entity_id = entity.id
 # entity_id = '6e390cd2-1cd8-4e4c-bee4-7f992ac82828'
-"""
-entity_id = "65235f18-c18e-40e6-8c16-b1fdff9da6ce"
+
+#entity_id = "65235f18-c18e-40e6-8c16-b1fdff9da6ce"
 print(entity_id)
 
 single_config_entity = client.get_entity(

@@ -1,11 +1,88 @@
 import os
 import json
+import shutil
 from datetime import datetime, UTC
 from typing import Literal
 
 import httpx
-from entitysdk import ProjectContext
+import entitysdk
+from obi_auth import get_token
 from rich import print
+from enum import StrEnum, auto
+
+
+def clean_dir_if_exists(path):
+
+    if path.exists():
+        shutil.rmtree(path)
+
+    path.mkdir(parents=True)
+
+    return path
+
+
+class TokenMode(StrEnum):
+    access_token_platform = auto()
+    access_token_keycloak = auto()
+
+
+class RemoteTaskManager:
+    def __init__(
+        self,
+        *,
+        output_dir,
+        task_type,
+        subdomain,
+        obi_one_deployment,
+        launch_system_deployment,
+        db_deployment,
+    ):
+
+        data = get_vlab_proj(
+            subdomain=subdomain,
+            deployment=db_deployment,
+        )
+        self._virtual_lab_id = data["virtual_lab_id"]
+        self._project_id = data["project_id"]
+
+        self._token_manager = os.environ["ACCESS_TOKEN"]
+        #self._token_manager = get_token(environment=launch_system_deployment)
+
+        self.output_dir = clean_dir_if_exists(output_dir)
+        self._task_type = task_type
+        self._obi_one_deployment = obi_one_deployment
+        self._launch_system_deployment = launch_system_deployment
+        self._db_deployment = db_deployment
+
+    @property
+    def launch_system_client(self):
+        return get_launch_system_client(
+            deployment=self._launch_system_deployment,
+            token=self._token_manager,
+        )
+
+    @property
+    def obi_one_client(self):
+        return get_obi_one_client(
+            virtual_lab_id=self._virtual_lab_id,
+            project_id=self._project_id,
+            deployment=self._obi_one_deployment,
+            token=self._token_manager,
+        )
+
+    def get_db_client(self):
+        return entitysdk.Client(
+            project_context=entitysdk.ProjectContext(
+                virtual_lab_id=self._virtual_lab_id,
+                project_id=self._project_id,
+                environment=self._db_deployment,
+            ),
+            token_manager=self._token_manager,
+            environment=self._db_deployment,
+        )
+
+    def run_task(self, *, config_id):
+        data = self.obi_one_client.launch_task(task_type=self._task_type, config_id=config_id)
 
 
 class OBIClient:
@@ -19,7 +96,6 @@ class OBIClient:
             .raise_for_status()
             .json()
         )
-
 
 class LaunchClient:
     def __init__(self, http_client):
@@ -41,6 +117,32 @@ class LaunchClient:
                 dct = json.loads(msg)
                 yield dct
 
+    def pprint_messages(self, job_id: str):
+        for dct in self.stream_messages(job_id):
+            match dct["message_type"]:
+                case "stdout":
+                    print(f"[white]STDOUT: {dct['stdout']}[/white]")
+                case "stderr":
+                    print(f"[orange1]STDERR: {dct['stderr']}[/orange1]")
+                case "log":
+                    msg = f"{dct['level']}:{dct['message']}"
+                    match dct["level"]:
+                        case "INFO":
+                            print(f"[dodger_blue1]{msg}[/dodger_blue1]")
+                        case "WARNING":
+                            print(f"[yellow]{msg}[/yellow]")
+                        case "DEBUG":
+                            print(f"[sky_blue1]{msg}[/sky_blue1]")
+                        case "ERROR":
+                            print(f"[red]{msg}[/red]")
+                        case "CRITICAL":
+                            print(f"[bold white on red]{msg}[/bold white on red]")
+                        case _:
+                            print(msg)
+                case "status":
+                    print(f"[magenta]STATUS: {dct['status']}[/magenta]")
+                case _:
+                    print(dct)
 
 def create_activity(
     *,
@@ -61,85 +163,62 @@ def create_activity(
     return activity
 
 
-def get_project_context(
-    subdomain: Literal["cell_a", "cell_b"], environment
-) -> ProjectContext:
+def get_vlab_proj(subdomain, deployment):
+    assert deployment == "staging"
     return {
-        "cell_a": ProjectContext(
-            virtual_lab_id="594fd60d-7a38-436f-939d-500feaa13bba",
-            project_id="54aa306a-b7db-4087-82ec-c6dec1617df4",
-            environment=environment,
-        ),
-        "cell_b": ProjectContext(
-            virtual_lab_id="47280b42-f521-4343-adda-8a2aef504f0c",
-            project_id="afa210d1-ed66-429f-b0b4-3df85e667f4d",
-            environment=environment,
-        ),
+        "cell_a": {
+            "virtual_lab_id": "594fd60d-7a38-436f-939d-500feaa13bba",
+            "project_id": "54aa306a-b7db-4087-82ec-c6dec1617df4",
+        },
+        "cell_b": {
+            "virtual_lab_id": "47280b42-f521-4343-adda-8a2aef504f0c",
+            "project_id": "afa210d1-ed66-429f-b0b4-3df85e667f4d",
+        }
     }[subdomain]
 
 
-def get_obi_one_client(project_context, environment) -> httpx.Client:
-    token = os.environ["ACCESS_TOKEN"]
+def get_obi_one_client(virtual_lab_id, project_id, deployment, token) -> httpx.Client:
     headers = {
         "Authorization": f"Bearer {token}",
-        "virtual-lab-id": str(project_context.virtual_lab_id),
-        "project-id": str(project_context.project_id),
+        "virtual-lab-id": str(virtual_lab_id),
+        "project-id": str(project_id),
     }
     base_url = {
         "local": "http://127.0.0.1:8100",
         "staging": "https://staging.cell-a.openbraininstitute.org/api/obi-one",
-    }[environment]
+    }[deployment]
 
     http_client = httpx.Client(base_url=base_url, headers=headers)
     return OBIClient(http_client)
 
 
-def get_launch_system_client(project_context, environment) -> httpx.Client:
-    token = os.environ["ACCESS_TOKEN"]
+def get_launch_system_client(deployment, token: str) -> httpx.Client:
     base_url = {
         "local": "http://127.0.0.1:8001",
-        "staging": "https://staging.cell-a.openbraininstitute.org/api/launch-system/",
-    }[environment]
+        "staging": "https://staging.cell-a.openbraininstitute.org/api/launch-system",
+    }[deployment]
     http_client = httpx.Client(
         base_url=base_url, headers={"Authorization": f"Bearer {token}"}
     )
     return LaunchClient(http_client)
 
 
-def run_cloud_task(*, task_type: str, config_id: str, subdomain: str, environment: str):
-    access_token = os.environ["ACCESS_TOKEN"]
+def run_cloud_task(task_type, config_id, subdomain, environment):
 
-    project_context = get_project_context(subdomain, "staging")
+    token = os.environ["ACCESS_TOKEN"]
 
-    obi_client = get_obi_one_client(project_context, environment)
-    ls_client = get_launch_system_client(project_context, "staging")
+    data = get_vlab_proj(subdomain, "staging")
+    vlab_id = data["virtual_lab_id"]
+    proj_id = data["project_id"]
 
-    data = obi_client.launch_task(
-        task_type=task_type, config_id=config_id
+    obi_client = get_obi_one_client(
+        virtual_lab_id=vlab_id,
+        project_id=proj_id,
+        deployment=environment,
+        token=token,
     )
+    ls_client = get_launch_system_client("staging", token=token)
 
-    for dct in ls_client.stream_messages(data["job_id"]):
-        match dct["message_type"]:
-            case "stdout":
-                print(f"[white]STDOUT: {dct['stdout']}[/white]")
-            case "stderr":
-                print(f"[orange1]STDERR: {dct['stderr']}[/orange1]")
-            case "log":
-                msg = f"{dct['level']}:{dct['message']}"
-                match dct["level"]:
-                    case "INFO":
-                        print(f"[dodger_blue1]{msg}[/dodger_blue1]")
-                    case "WARNING":
-                        print(f"[yellow]{msg}[/yellow]")
-                    case "DEBUG":
-                        print(f"[sky_blue1]{msg}[/sky_blue1]")
-                    case "ERROR":
-                        print(f"[red]{msg}[/red]")
-                    case "CRITICAL":
-                        print(f"[bold white on red]{msg}[/bold white on red]")
-                    case _:
-                        print(msg)
-            case "status":
-                print(f"[magenta]STATUS: {dct['status']}[/magenta]")
-            case _:
-                print(dct)
+    data = obi_client.launch_task(task_type=task_type, config_id=config_id)
+
+    ls_client.pprint_messages(data["job_id"])
