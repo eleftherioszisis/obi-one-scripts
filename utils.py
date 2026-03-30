@@ -10,6 +10,8 @@ from obi_auth import get_token
 from rich import print
 from enum import StrEnum, auto
 
+L = logging.getLogger(__name__)
+
 
 def clean_dir_if_exists(path):
 
@@ -206,6 +208,7 @@ def get_obi_one_client(virtual_lab_id, project_id, deployment, token) -> httpx.C
     }[deployment]
 
     http_client = httpx.Client(base_url=base_url, headers=headers)
+    L.info("OBI client base_url=%s, vlab_id=%s, proj_id=%s", base_url, virtual_lab_id, project_id)
     return OBIClient(http_client)
 
 
@@ -219,6 +222,7 @@ def get_launch_system_client(deployment, token: str) -> httpx.Client:
         headers={"Authorization": f"Bearer {token}"},
         verify=False,
     )
+    L.info("launch-system client base_url=%s", base_url)
     return LaunchClient(http_client)
 
 
@@ -232,6 +236,7 @@ def get_db_client(*, subdomain, token, project_context=None):
 
         project_context = entitysdk.ProjectContext(virtual_lab_id=vlab_id, project_id=proj_id, environment="staging")
 
+    L.info("DB client project_context=%s", project_context)
     return DBClient(
         project_context=project_context,
         token_manager=token,
@@ -246,6 +251,8 @@ def run_cloud_task(task_type, config_id, subdomain, environment, check_mode="lau
     vlab_id = data["virtual_lab_id"]
     proj_id = data["project_id"]
 
+    L.info("vlab-proj: %s", data)
+
     obi_client = get_obi_one_client(
         virtual_lab_id=vlab_id,
         project_id=proj_id,
@@ -255,5 +262,7 @@ def run_cloud_task(task_type, config_id, subdomain, environment, check_mode="lau
     ls_client = get_launch_system_client("staging", token=token)
 
     data = obi_client.launch_task(task_type=task_type, config_id=config_id)
+
+    L.info("OBI response: %s", data)
 
     ls_client.pprint_messages(data["job_id"])
