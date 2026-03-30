@@ -8,6 +8,8 @@ from utils import RemoteTaskManager
 
 OUTPUT_DIR = Path(__file__).parent / "out/circuit_extraction/cloud"
 
+L = logging.getLogger(__name__)
+
 
 def create_config(manager):
 
@@ -15,7 +17,7 @@ def create_config(manager):
     circuit_id = "0182b55e-2f38-4e06-bbd0-b11e70449804"
 
     circuit_from_id = obi.CircuitFromID(id_str=circuit_id)
-    circuit_entity = circuit_from_id.entity(db_client=db_client)
+    # circuit_entity = circuit_from_id.entity(db_client=db_client)
 
     initialize = obi.CircuitExtractionScanConfig.Initialize(circuit=circuit_from_id)
 

@@ -1,12 +1,12 @@
 import os
 import json
 import shutil
+import logging
+from time import sleep
 from datetime import datetime, UTC
-from typing import Literal
 
 import httpx
 import entitysdk
-from obi_auth import get_token
 from rich import print
 from enum import StrEnum, auto
 
@@ -158,7 +158,7 @@ class DBClient(entitysdk.Client):
     def poll_status(self, activity_id, activity_type):
         while True:
             activity = self.get_entity(entity_type=activity_type, activity_id=activity_id)
-            pprint(f"Status: {activity.status}")
+            print(f"Status: {activity.status}")
             if activity.status in {"pending", "running"}:
                 sleep(2)
 

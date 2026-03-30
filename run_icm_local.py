@@ -2,35 +2,30 @@
 # have to install the following branches:
 # https://github.com/openbraininstitute/obi-one/tree/simulate-icm
 
-import json
 import pathlib
 import subprocess
 from datetime import datetime, UTC
 
 from entitysdk import models
+from obi_auth import get_token
 
 from obi_one.core.info import Info
 from obi_one.scientific.from_id.ion_channel_model_from_id import IonChannelModelFromID
 from obi_one.scientific.blocks.ion_channel_model import IonChannelModelWithConductance
 from obi_one.scientific.blocks.recording import (
-    IonChannelVariableRecording,
     SomaVoltageRecording,
 )
 from obi_one.scientific.blocks.stimuli.stimulus import (
     SEClampSomaticStimulus,
-    ConstantCurrentClampSomaticStimulus,
 )
 from obi_one.scientific.tasks.generate_simulations.config.ion_channel_models import (
     IonChannelModelSimulationScanConfig,
 )
 
-from obi_one.scientific.tasks.ion_channel_model_simulation_execution import (
-    IonChannelModelSimulationExecutionTask,
-    #IonChannelModelSimulationExecutionConfig,
-)
 from obi_one.core.run_tasks import run_task_type
 
 import obi_one as obi
+from entisdk import ProjectContext, Client
 
 import logging
 
@@ -113,9 +108,6 @@ with open(f"./{output_root}/simulate_ion_channel_scan_config.json", "w") as f:
 # validate
 validated_sim_conf = sim_conf.validated_config()
 
-# create the client
-from entitysdk import Client, ProjectContext
-from obi_auth import get_token
 
 
 project_id = "54aa306a-b7db-4087-82ec-c6dec1617df4"

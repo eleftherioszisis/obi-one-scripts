@@ -21,7 +21,7 @@ CIRCUIT_ID = "0182b55e-2f38-4e06-bbd0-b11e70449804"
 def create_config(output_dir):
 
     circuit_from_id = obi.CircuitFromID(id_str=CIRCUIT_ID)
-    circuit_entity = circuit_from_id.entity(db_client=db_client)
+    # circuit_entity = circuit_from_id.entity(db_client=client)
 
     initialize = obi.CircuitExtractionScanConfig.Initialize(circuit=circuit_from_id)
 
@@ -37,7 +37,7 @@ def create_config(output_dir):
         coordinate_directory_option="ZERO_INDEX",
         output_root=output_root
     )
-    scan.execute(db_client=db_client)
+    scan.execute(db_client=client)
 
     single_config_entity = scan.single_configs[0].single_entity
 

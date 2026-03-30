@@ -2,24 +2,25 @@ import logging
 from pathlib import Path
 import subprocess
 import obi_one as obi
-import logging
 
 from obi_one.core.info import Info
+from obi_one.types import TaskType
 from obi_one.scientific.from_id.ion_channel_model_from_id import IonChannelModelFromID
 from obi_one.scientific.blocks.ion_channel_model import IonChannelModelWithConductance
 from obi_one.scientific.blocks.recording import (
-    IonChannelVariableRecording,
     SomaVoltageRecording,
 )
 from obi_one.scientific.blocks.stimuli.stimulus import (
     SEClampSomaticStimulus,
-    ConstantCurrentClampSomaticStimulus,
 )
 from obi_one.scientific.tasks.generate_simulations.config.ion_channel_models import (
     IonChannelModelSimulationScanConfig,
 )
+from entitysdk import models
 
 from utils import RemoteTaskManager
+
+L = logging.getLogger(__name__)
 
 OUTPUT_DIR = Path(__file__).parent / "out/icm/cloud"
 

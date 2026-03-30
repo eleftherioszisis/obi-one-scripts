@@ -16,7 +16,7 @@ def create_config(manager):
 
     mesh_id = "6dd9bb20-255c-4eb6-a88a-dcb49fddc65e"
     mesh_from_id = obi.EMCellMeshFromID(id_str=mesh_id)
-    mesh_entity = mesh_from_id.entity(db_client=db_client)
+    #mesh_entity = mesh_from_id.entity(db_client=db_client)
 
     initialize = obi.SkeletonizationScanConfig.Initialize(cell_mesh=mesh_from_id)
     info = obi.Info(campaign_name="Skeletonization Campaign", campaign_description="Skeletonization of a morphology mesh.")

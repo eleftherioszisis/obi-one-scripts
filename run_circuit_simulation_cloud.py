@@ -1,6 +1,4 @@
 import os
-import httpx
-from time import sleep
 
 from utils import get_obi_one_client, get_launch_system_client
 
