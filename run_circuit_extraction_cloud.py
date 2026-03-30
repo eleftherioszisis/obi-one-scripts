@@ -1,29 +1,20 @@
+import logging
 from pathlib import Path
 
 import obi_one as obi
 from obi_one.types import TaskType
 
-from utils import clean_dir_if_exists, RemoteTaskManager
+from utils import RemoteTaskManager
 
 OUTPUT_DIR = Path(__file__).parent / "out/circuit_extraction/cloud"
-
-CIRCUIT_ID = "0182b55e-2f38-4e06-bbd0-b11e70449804"
-
-manager = RemoteTaskManager(
-    output_dir=OUTPUT_DIR,
-    task_type=TaskType.circuit_extraction,
-    subdomain="cell_a",
-    obi_one_deployment="local",
-    launch_system_deployment="staging",
-    db_deployment="staging",
-)
 
 
 def create_config(manager):
 
-    db_client = manager.get_db_client()
+    db_client = manager.db_client()
+    circuit_id = "0182b55e-2f38-4e06-bbd0-b11e70449804"
 
-    circuit_from_id = obi.CircuitFromID(id_str=CIRCUIT_ID)
+    circuit_from_id = obi.CircuitFromID(id_str=circuit_id)
     circuit_entity = circuit_from_id.entity(db_client=db_client)
 
     initialize = obi.CircuitExtractionScanConfig.Initialize(circuit=circuit_from_id)
@@ -45,5 +36,16 @@ def create_config(manager):
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.DEBUG)
+
+    manager = RemoteTaskManager(
+        output_dir=OUTPUT_DIR,
+        task_type=TaskType.circuit_extraction,
+        subdomain="cell_a",
+        obi_one_deployment="staging",
+        launch_system_deployment="staging",
+        db_deployment="staging",
+    )
     config = create_config(manager)
+    L.info("Config: %s", config)
     manager.run_task(config_id=config.id)

@@ -70,7 +70,8 @@ class RemoteTaskManager:
             token=self._token_manager,
         )
 
-    def get_db_client(self):
+    @property
+    def db_client(self):
         return entitysdk.Client(
             project_context=entitysdk.ProjectContext(
                 virtual_lab_id=self._virtual_lab_id,
@@ -81,8 +82,13 @@ class RemoteTaskManager:
             environment=self._db_deployment,
         )
 
-    def run_task(self, *, config_id):
+    def run_task(self, *, config_id, activity_only=False):
         data = self.obi_one_client.launch_task(task_type=self._task_type, config_id=config_id)
+
+        if activity_only:
+            self.db_client.poll_status(data["activity_id"])
+        else:
+            self.launch_system_client.pprint_messages(data["job_id"])
 
 
 class OBIClient:
@@ -144,6 +150,17 @@ class LaunchClient:
                 case _:
                     print(dct)
 
+
+class DBClient(entitysdk.Client):
+
+    def poll_status(self, activity_id, activity_type):
+        while True:
+            activity = self.get_entity(entity_type=activity_type, activity_id=activity_id)
+            pprint(f"Status: {activity.status}")
+            if activity.status in {"pending", "running"}:
+                sleep(2)
+
+
 def create_activity(
     *,
     client,
@@ -195,15 +212,33 @@ def get_obi_one_client(virtual_lab_id, project_id, deployment, token) -> httpx.C
 def get_launch_system_client(deployment, token: str) -> httpx.Client:
     base_url = {
         "local": "http://127.0.0.1:8001",
-        "staging": "https://staging.cell-a.openbraininstitute.org/api/launch-system",
+        "staging": "https://127.0.0.1:4444/api/launch-system"
     }[deployment]
     http_client = httpx.Client(
-        base_url=base_url, headers={"Authorization": f"Bearer {token}"}
+        base_url=base_url,
+        headers={"Authorization": f"Bearer {token}"},
+        verify=False,
     )
     return LaunchClient(http_client)
 
 
-def run_cloud_task(task_type, config_id, subdomain, environment):
+def get_db_client(*, subdomain, token, project_context=None):
+
+    if project_context is None:
+
+        data = get_vlab_proj(subdomain, "staging")
+        vlab_id = data["virtual_lab_id"]
+        proj_id = data["project_id"]
+
+        project_context = entitysdk.ProjectContext(virtual_lab_id=vlab_id, project_id=proj_id, environment="staging")
+
+    return DBClient(
+        project_context=project_context,
+        token_manager=token,
+        environment="staging",
+    )
+
+def run_cloud_task(task_type, config_id, subdomain, environment, check_mode="launch-system"):
 
     token = os.environ["ACCESS_TOKEN"]
 
