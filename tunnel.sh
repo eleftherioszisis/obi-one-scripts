@@ -25,6 +25,8 @@ aws ssm start-session \
 # Wait for the tunnel to be ready
 until nc -z localhost $LOCAL_SSH_PORT 2>/dev/null; do sleep 1; done
 
+sleep 1
+
 # Use SSH to forward multiple ports at once
 ssh obi-staging -N \
   -L 4444:staging.cell-a.openbraininstitute.org:443

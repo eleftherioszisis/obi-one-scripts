@@ -12,6 +12,17 @@ from enum import StrEnum, auto
 
 L = logging.getLogger(__name__)
 
+DEFAULT_DOMAINS = {
+    "cell_a": {
+        "virtual_lab_id": "594fd60d-7a38-436f-939d-500feaa13bba",
+        "project_id": "54aa306a-b7db-4087-82ec-c6dec1617df4",
+    },
+    "cell_b": {
+        "virtual_lab_id": "47280b42-f521-4343-adda-8a2aef504f0c",
+        "project_id": "afa210d1-ed66-429f-b0b4-3df85e667f4d",
+    }
+}
+
 
 def clean_dir_if_exists(path):
 
@@ -38,12 +49,9 @@ class RemoteTaskManager:
         obi_one_deployment,
         launch_system_deployment,
         db_deployment,
+        domains=DEFAULT_DOMAINS,
     ):
-
-        data = get_vlab_proj(
-            subdomain=subdomain,
-            deployment=db_deployment,
-        )
+        data = domains[subdomain]
         self._virtual_lab_id = data["virtual_lab_id"]
         self._project_id = data["project_id"]
 
@@ -55,6 +63,7 @@ class RemoteTaskManager:
         self._obi_one_deployment = obi_one_deployment
         self._launch_system_deployment = launch_system_deployment
         self._db_deployment = db_deployment
+        self._domains = domains
 
     @property
     def launch_system_client(self):
@@ -74,7 +83,7 @@ class RemoteTaskManager:
 
     @property
     def db_client(self):
-        return entitysdk.Client(
+        return DBClient(
             project_context=entitysdk.ProjectContext(
                 virtual_lab_id=self._virtual_lab_id,
                 project_id=self._project_id,
@@ -84,11 +93,11 @@ class RemoteTaskManager:
             environment=self._db_deployment,
         )
 
-    def run_task(self, *, config_id, activity_only=False):
+    def run_task(self, *, config_id, activity_only=False, **kwargs):
         data = self.obi_one_client.launch_task(task_type=self._task_type, config_id=config_id)
 
         if activity_only:
-            self.db_client.poll_status(data["activity_id"])
+            self.db_client.poll_status(activity_id=data["activity_id"], activity_type=kwargs["activity_type"])
         else:
             self.launch_system_client.pprint_messages(data["job_id"])
 
@@ -157,7 +166,7 @@ class DBClient(entitysdk.Client):
 
     def poll_status(self, activity_id, activity_type):
         while True:
-            activity = self.get_entity(entity_type=activity_type, activity_id=activity_id)
+            activity = self.get_entity(entity_type=activity_type, entity_id=activity_id)
             print(f"Status: {activity.status}")
             if activity.status in {"pending", "running"}:
                 sleep(2)

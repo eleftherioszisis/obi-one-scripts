@@ -3,6 +3,7 @@ from pathlib import Path
 
 import obi_one as obi
 from obi_one.types import TaskType
+from entitysdk import models
 
 from utils import RemoteTaskManager
 
@@ -13,7 +14,7 @@ L = logging.getLogger(__name__)
 
 def create_config(manager):
 
-    db_client = manager.db_client()
+    db_client = manager.db_client
     circuit_id = "0182b55e-2f38-4e06-bbd0-b11e70449804"
 
     circuit_from_id = obi.CircuitFromID(id_str=circuit_id)
@@ -43,11 +44,11 @@ if __name__ == "__main__":
     manager = RemoteTaskManager(
         output_dir=OUTPUT_DIR,
         task_type=TaskType.circuit_extraction,
-        subdomain="cell_a",
+        subdomain="cell_b",
         obi_one_deployment="staging",
         launch_system_deployment="staging",
         db_deployment="staging",
     )
     config = create_config(manager)
     L.info("Config: %s", config)
-    manager.run_task(config_id=config.id)
+    manager.run_task(config_id=config.id, activity_only=True, activity_type=models.TaskActivity)
