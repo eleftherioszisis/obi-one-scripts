@@ -24,7 +24,7 @@ L = logging.getLogger(__name__)
 
 OUTPUT_DIR = Path(__file__).parent / "out/icm/cloud"
 
-#simulation_id = "42b1247e-57d1-4161-8b24-9ddc8af2ed0f"
+# simulation_id = "42b1247e-57d1-4161-8b24-9ddc8af2ed0f"
 
 
 def create_config(manager):
@@ -56,13 +56,13 @@ def create_config(manager):
         },
         stimuli={
             "seclamp1": SEClampSomaticStimulus(
-                        level1_duration=50,
-                        level1_voltage=-80,
-                        level2_duration=100,
-                        level2_voltage=0,
-                        level3_duration=50,
-                        level3_voltage=-80,
-                    )
+                level1_duration=50,
+                level1_voltage=-80,
+                level2_duration=100,
+                level2_voltage=0,
+                level3_duration=50,
+                level3_voltage=-80,
+            )
         },
         recordings={
             "rec_voltage": SomaVoltageRecording(
@@ -92,13 +92,12 @@ def create_config(manager):
     grid_scan.execute(db_client=db_client)
     obi.run_tasks_for_generated_scan(grid_scan, db_client=db_client)
 
-    
     campaign_id = grid_scan.form.campaign.id
-
 
     entity = (
         db_client.search_entity(
-            entity_type=models.SimulationGeneration, query={"used__id": str(campaign_id)}
+            entity_type=models.SimulationGeneration,
+            query={"used__id": str(campaign_id)},
         )
         .one()
         .generated[0]
@@ -107,7 +106,6 @@ def create_config(manager):
 
 
 if __name__ == "__main__":
-    
     logging.basicConfig(level=logging.DEBUG)
 
     manager = RemoteTaskManager(

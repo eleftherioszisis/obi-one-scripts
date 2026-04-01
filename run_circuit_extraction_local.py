@@ -26,16 +26,21 @@ def create_config(output_dir):
     initialize = obi.CircuitExtractionScanConfig.Initialize(circuit=circuit_from_id)
 
     # Create a CircuitExtractionScanConfig object with the initialize object
-    neuron_set=obi.PredefinedNeuronSet(node_set="Excitatory", sample_percentage=50)
-    info = obi.Info(campaign_name="EXC-Extraction", campaign_description="Extraction of percentages of EXC neurons")
-    scan_config = obi.CircuitExtractionScanConfig(initialize=initialize, neuron_set=neuron_set, info=info)
+    neuron_set = obi.PredefinedNeuronSet(node_set="Excitatory", sample_percentage=50)
+    info = obi.Info(
+        campaign_name="EXC-Extraction",
+        campaign_description="Extraction of percentages of EXC neurons",
+    )
+    scan_config = obi.CircuitExtractionScanConfig(
+        initialize=initialize, neuron_set=neuron_set, info=info
+    )
 
     # Create the grid scan object
     output_root = output_dir / "circuit_extraction_on_launch_system/grid_scan"
     scan = obi.GridScanGenerationTask(
         form=scan_config,
         coordinate_directory_option="ZERO_INDEX",
-        output_root=output_root
+        output_root=output_root,
     )
     scan.execute(db_client=client)
 

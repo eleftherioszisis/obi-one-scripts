@@ -83,13 +83,13 @@ sim_conf = IonChannelModelSimulationScanConfig(
     },
     stimuli={
         "seclamp1": SEClampSomaticStimulus(
-                    level1_duration=50,
-                    level1_voltage=-80,
-                    level2_duration=100,
-                    level2_voltage=0,
-                    level3_duration=50,
-                    level3_voltage=-80,
-                )
+            level1_duration=50,
+            level1_voltage=-80,
+            level2_duration=100,
+            level2_voltage=0,
+            level3_duration=50,
+            level3_voltage=-80,
+        )
     },
     recordings={
         "rec_voltage": SomaVoltageRecording(
@@ -107,7 +107,6 @@ with open(f"./{output_root}/simulate_ion_channel_scan_config.json", "w") as f:
 
 # validate
 validated_sim_conf = sim_conf.validated_config()
-
 
 
 project_id = "54aa306a-b7db-4087-82ec-c6dec1617df4"
@@ -150,7 +149,7 @@ entity = (
 entity_id = entity.id
 # entity_id = '6e390cd2-1cd8-4e4c-bee4-7f992ac82828'
 
-#entity_id = "65235f18-c18e-40e6-8c16-b1fdff9da6ce"
+# entity_id = "65235f18-c18e-40e6-8c16-b1fdff9da6ce"
 print(entity_id)
 
 single_config_entity = client.get_entity(

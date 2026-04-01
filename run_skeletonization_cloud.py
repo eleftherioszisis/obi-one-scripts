@@ -16,10 +16,13 @@ def create_config(manager):
 
     mesh_id = "6dd9bb20-255c-4eb6-a88a-dcb49fddc65e"
     mesh_from_id = obi.EMCellMeshFromID(id_str=mesh_id)
-    #mesh_entity = mesh_from_id.entity(db_client=db_client)
+    # mesh_entity = mesh_from_id.entity(db_client=db_client)
 
     initialize = obi.SkeletonizationScanConfig.Initialize(cell_mesh=mesh_from_id)
-    info = obi.Info(campaign_name="Skeletonization Campaign", campaign_description="Skeletonization of a morphology mesh.")
+    info = obi.Info(
+        campaign_name="Skeletonization Campaign",
+        campaign_description="Skeletonization of a morphology mesh.",
+    )
 
     scan_config = obi.SkeletonizationScanConfig(initialize=initialize, info=info)
 
@@ -34,16 +37,19 @@ def create_config(manager):
     scan.execute(db_client=db_client)
 
     campaign_entity = scan.form.campaign
-    print(f"Campaign '{campaign_entity.name}' (ID {campaign_entity.id}): {campaign_entity.description}")
+    print(
+        f"Campaign '{campaign_entity.name}' (ID {campaign_entity.id}): {campaign_entity.description}"
+    )
 
     for cfg in scan.single_configs:
-        print(f"  Coordinate {cfg.idx}: '{cfg.single_entity.name}' (ID {cfg.single_entity.id})")
+        print(
+            f"  Coordinate {cfg.idx}: '{cfg.single_entity.name}' (ID {cfg.single_entity.id})"
+        )
 
     return scan.single_configs[0].single_entity
 
 
 if __name__ == "__main__":
-
     logging.basicConfig(level=logging.DEBUG)
 
     manager = RemoteTaskManager(

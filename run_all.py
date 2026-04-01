@@ -12,13 +12,12 @@ L = logging.getLogger(__name__)
 
 
 class Task(BaseModel):
-
     config_id: UUID
     task_type: TaskType
 
 
 subdomains = [
-    #("aws", "cell_a"),
+    # ("aws", "cell_a"),
     ("azure", "cell_b")
 ]
 
@@ -46,7 +45,6 @@ def main():
             except Exception:
                 L.exception("Task failed.")
                 print(f"{task.task_type}: {vendor} {subdomain} Failure")
-
 
 
 if __name__ == "__main__":

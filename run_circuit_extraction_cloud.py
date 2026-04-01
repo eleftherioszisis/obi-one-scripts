@@ -24,8 +24,13 @@ def create_config(manager):
 
     # Create a CircuitExtractionScanConfig object with the initialize object
     neuron_set = obi.PredefinedNeuronSet(node_set="Excitatory", sample_percentage=50)
-    info = obi.Info(campaign_name="EXC-Extraction", campaign_description="Extraction of percentages of EXC neurons")
-    scan_config = obi.CircuitExtractionScanConfig(initialize=initialize, neuron_set=neuron_set, info=info)
+    info = obi.Info(
+        campaign_name="EXC-Extraction",
+        campaign_description="Extraction of percentages of EXC neurons",
+    )
+    scan_config = obi.CircuitExtractionScanConfig(
+        initialize=initialize, neuron_set=neuron_set, info=info
+    )
 
     # Create the grid scan object
     scan = obi.GridScanGenerationTask(
@@ -51,4 +56,6 @@ if __name__ == "__main__":
     )
     config = create_config(manager)
     L.info("Config: %s", config)
-    manager.run_task(config_id=config.id, activity_only=True, activity_type=models.TaskActivity)
+    manager.run_task(
+        config_id=config.id, activity_only=True, activity_type=models.TaskActivity
+    )

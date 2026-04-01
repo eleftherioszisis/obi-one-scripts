@@ -3,10 +3,13 @@ import json
 import shutil
 import logging
 from time import sleep
+from functools import partial
 from datetime import datetime, UTC
+from obi_auth import get_token
 
 import httpx
 import entitysdk
+from entitysdk.token_manager import TokenManager, TokenFromFunction
 from rich import print
 from enum import StrEnum, auto
 
@@ -20,7 +23,7 @@ DEFAULT_DOMAINS = {
     "cell_b": {
         "virtual_lab_id": "47280b42-f521-4343-adda-8a2aef504f0c",
         "project_id": "afa210d1-ed66-429f-b0b4-3df85e667f4d",
-    }
+    },
 }
 
 
@@ -55,8 +58,17 @@ class RemoteTaskManager:
         self._virtual_lab_id = data["virtual_lab_id"]
         self._project_id = data["project_id"]
 
-        self._token_manager = os.environ["ACCESS_TOKEN"]
-        #self._token_manager = get_token(environment=launch_system_deployment)
+        # from the platform, needed for auth-manager dependent services
+        # like launch_system / obi_one
+        self._token = os.environ["ACCESS_TOKEN"]
+
+        # from obi_auth, for long lasting operations as it refreshes the token
+        self._token_manager = TokenFromFunction(
+            partial(
+                get_token,
+                environment=db_deployment,
+            ),
+        )
 
         self.output_dir = clean_dir_if_exists(output_dir)
         self._task_type = task_type
@@ -66,19 +78,24 @@ class RemoteTaskManager:
         self._domains = domains
 
     @property
-    def launch_system_client(self):
-        return get_launch_system_client(
-            deployment=self._launch_system_deployment,
-            token=self._token_manager,
-        )
-
-    @property
     def obi_one_client(self):
         return get_obi_one_client(
             virtual_lab_id=self._virtual_lab_id,
             project_id=self._project_id,
             deployment=self._obi_one_deployment,
-            token=self._token_manager,
+            token=self._token,
+        )
+
+    @property
+    def launch_system_client(self):
+        """Get launch-system client.
+
+        Note: Using token manager because jobs are submitted from obi-one.
+        This means that we don't need to pass persistent-token stuff here.
+        """
+        return get_launch_system_client(
+            deployment=self._launch_system_deployment,
+            token_manager=self._token_manager,
         )
 
     @property
@@ -93,13 +110,25 @@ class RemoteTaskManager:
             environment=self._db_deployment,
         )
 
-    def run_task(self, *, config_id, activity_only=False, **kwargs):
-        data = self.obi_one_client.launch_task(task_type=self._task_type, config_id=config_id)
-
-        if activity_only:
-            self.db_client.poll_status(activity_id=data["activity_id"], activity_type=kwargs["activity_type"])
-        else:
-            self.launch_system_client.pprint_messages(data["job_id"])
+    def run_task(self, *, config_id, check_mode: str, **kwargs):
+        data = self.obi_one_client.launch_task(
+            task_type=self._task_type, config_id=config_id
+        )
+        L.info("Job succefully submitted: %s", data)
+        match check_mode:
+            case "stream":
+                self.launch_system_client.pprint_messages(data["job_id"])
+            case "activity":
+                self.db_client.poll_status(
+                    activity_id=data["activity_id"],
+                    activity_type=kwargs["activity_type"],
+                )
+            case "job":
+                while True:
+                    job = self.launch_system_client.get_job(data["job_id"])
+                    print(f"STATUS: {job['status']}, LOGS: {job['logs']}")
+                    if job["status"] in {"pending", "running"}:
+                        sleep(2)
 
 
 class OBIClient:
@@ -114,14 +143,36 @@ class OBIClient:
             .json()
         )
 
+
 class LaunchClient:
-    def __init__(self, http_client):
+    def __init__(self, http_client, token_manager):
         self._http_client = http_client
+        self._token_manager = token_manager
+
+    def _get_token(self):
+        return (
+            self._token_manager
+            if isinstance(self._token_manager, str)
+            else self._token_manager.get_token()
+        )
+
+    def get_job(self, job_id: str):
+        token = self._get_token()
+        return (
+            self._http_client.get(
+                url=f"/job/{job_id}",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+            .raise_for_status()
+            .json()
+        )
 
     def stream_messages(self, job_id: str):
+        token = self._get_token()
         with self._http_client.stream(
             "GET",
-            f"/job/{job_id}/stream",
+            url=f"/job/{job_id}/stream",
+            headers={"Authorization": f"Bearer {token}"},
             timeout=httpx.Timeout(
                 connect=10.0,
                 read=None,
@@ -163,7 +214,6 @@ class LaunchClient:
 
 
 class DBClient(entitysdk.Client):
-
     def poll_status(self, activity_id, activity_type):
         while True:
             activity = self.get_entity(entity_type=activity_type, entity_id=activity_id)
@@ -201,7 +251,7 @@ def get_vlab_proj(subdomain, deployment):
         "cell_b": {
             "virtual_lab_id": "47280b42-f521-4343-adda-8a2aef504f0c",
             "project_id": "afa210d1-ed66-429f-b0b4-3df85e667f4d",
-        }
+        },
     }[subdomain]
 
 
@@ -217,33 +267,40 @@ def get_obi_one_client(virtual_lab_id, project_id, deployment, token) -> httpx.C
     }[deployment]
 
     http_client = httpx.Client(base_url=base_url, headers=headers)
-    L.info("OBI client base_url=%s, vlab_id=%s, proj_id=%s", base_url, virtual_lab_id, project_id)
+    L.info(
+        "OBI client base_url=%s, vlab_id=%s, proj_id=%s",
+        base_url,
+        virtual_lab_id,
+        project_id,
+    )
     return OBIClient(http_client)
 
 
-def get_launch_system_client(deployment, token: str) -> httpx.Client:
+def get_launch_system_client(
+    deployment, token_manager: str | TokenManager
+) -> httpx.Client:
     base_url = {
         "local": "http://127.0.0.1:8001",
-        "staging": "https://127.0.0.1:4444/api/launch-system"
+        "staging": "https://127.0.0.1:4444/api/launch-system",
     }[deployment]
     http_client = httpx.Client(
         base_url=base_url,
-        headers={"Authorization": f"Bearer {token}"},
         verify=False,
     )
     L.info("launch-system client base_url=%s", base_url)
-    return LaunchClient(http_client)
+    return LaunchClient(http_client=http_client, token_manager=token_manager)
 
 
 def get_db_client(*, subdomain, token, project_context=None):
 
     if project_context is None:
-
         data = get_vlab_proj(subdomain, "staging")
         vlab_id = data["virtual_lab_id"]
         proj_id = data["project_id"]
 
-        project_context = entitysdk.ProjectContext(virtual_lab_id=vlab_id, project_id=proj_id, environment="staging")
+        project_context = entitysdk.ProjectContext(
+            virtual_lab_id=vlab_id, project_id=proj_id, environment="staging"
+        )
 
     L.info("DB client project_context=%s", project_context)
     return DBClient(
@@ -252,7 +309,10 @@ def get_db_client(*, subdomain, token, project_context=None):
         environment="staging",
     )
 
-def run_cloud_task(task_type, config_id, subdomain, environment, check_mode="launch-system"):
+
+def run_cloud_task(
+    task_type, config_id, subdomain, environment, check_mode="launch-system"
+):
 
     token = os.environ["ACCESS_TOKEN"]
 
