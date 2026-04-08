@@ -31,7 +31,6 @@ OUTPUT_DIR = Path(__file__).parent / "out/circuit_extraction/cloud"
 
 TOKEN = os.environ["ACCESS_TOKEN"]
 
-
 """
 http_client = httpx.Client(
     base_url="https://staging.cell-a.openbraininstitute.org/api/auth-manager/v1",
@@ -40,7 +39,6 @@ http_client = httpx.Client(
 
 res = http_client.get("/offline-token").raise_for_status().json()
 webbrowser.open(res["data"]["consent_url"])
-
 """
 
 if __name__ == "__main__":
