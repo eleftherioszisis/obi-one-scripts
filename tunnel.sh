@@ -17,10 +17,15 @@ BASTION_USERNAME=$(aws sts get-caller-identity --query 'UserId' --output text | 
 # Start the SSM session
 echo "Connecting to instance $INSTANCE_ID as user $BASTION_USERNAME..."
 
+#aws ssm start-session \
+#  --target "$INSTANCE_ID" \
+#  --document-name AWS-StartPortForwardingSession \
+#  --parameters portNumber=22,localPortNumber=$LOCAL_SSH_PORT &
+
 aws ssm start-session \
   --target "$INSTANCE_ID" \
-  --document-name AWS-StartPortForwardingSession \
-  --parameters portNumber=22,localPortNumber=$LOCAL_SSH_PORT &
+  --document-name AWS-StartPortForwardingSessionToRemoteHost \
+  --parameters '{"host":["staging.cell-a.openbraininstitute.org"],"portNumber":["443"],"localPortNumber":["4444"]}'
 
 # Wait for the tunnel to be ready
 until nc -z localhost $LOCAL_SSH_PORT 2>/dev/null; do sleep 1; done
@@ -28,5 +33,5 @@ until nc -z localhost $LOCAL_SSH_PORT 2>/dev/null; do sleep 1; done
 sleep 1
 
 # Use SSH to forward multiple ports at once
-ssh obi-staging -N \
-  -L 4444:staging.cell-a.openbraininstitute.org:443
+#ssh obi-staging -N \
+#  -L 4444:staging.cell-a.openbraininstitute.org:443
