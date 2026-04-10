@@ -57,5 +57,7 @@ if __name__ == "__main__":
     config = create_config(manager)
     L.info("Config: %s", config)
     manager.run_task(
-        config_id=config.id, activity_only=True, activity_type=models.TaskActivity
+        config_id=config.id,
+        activity_type=models.TaskActivity
+        check_mode="job",
     )
