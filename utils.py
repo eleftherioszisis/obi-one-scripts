@@ -129,6 +129,12 @@ class RemoteTaskManager:
                     print(f"STATUS: {job['status']}, LOGS: {job['logs']}")
                     if job["status"] in {"pending", "running"}:
                         sleep(2)
+            case "obi-one":
+                while True:
+                    job = self.obi_one_client.get_task(data["job_id"])
+                    print(f"STATUS: {job['status']}, LOGS: {job['logs']}")
+                    if job["status"] in {"pending", "running"}:
+                        sleep(2)
 
 
 class OBIClient:
@@ -142,6 +148,9 @@ class OBIClient:
             .raise_for_status()
             .json()
         )
+
+    def get_task(self, job_id) -> dict:
+        return self._http_client.get(f"/declared/task/{job_id}").raise_for_status().json()
 
 
 class LaunchClient:
