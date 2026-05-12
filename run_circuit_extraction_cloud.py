@@ -49,7 +49,7 @@ if __name__ == "__main__":
     manager = RemoteTaskManager(
         output_dir=OUTPUT_DIR,
         task_type=TaskType.circuit_extraction,
-        subdomain="cell_b",
+        subdomain="cell_a",
         obi_one_deployment="staging",
         launch_system_deployment="staging",
         db_deployment="staging",
@@ -58,6 +58,6 @@ if __name__ == "__main__":
     L.info("Config: %s", config)
     manager.run_task(
         config_id=config.id,
-        activity_type=models.TaskActivity
-        check_mode="job",
+        activity_type=models.TaskActivity,
+        check_mode="obi-one",
     )

@@ -1,4 +1,5 @@
 import os
+from uuid import UUID
 import json
 import shutil
 import logging
@@ -6,6 +7,7 @@ from time import sleep
 from functools import partial
 from datetime import datetime, UTC
 from obi_auth import get_token
+from pydantic import BaseModel
 
 import httpx
 import entitysdk
@@ -25,6 +27,11 @@ DEFAULT_DOMAINS = {
         "project_id": "afa210d1-ed66-429f-b0b4-3df85e667f4d",
     },
 }
+
+
+class TaskInfo(BaseModel):
+    job_id: UUID
+    activity_id: UUID
 
 
 def clean_dir_if_exists(path):
@@ -110,31 +117,47 @@ class RemoteTaskManager:
             environment=self._db_deployment,
         )
 
-    def run_task(self, *, config_id, check_mode: str, **kwargs):
+    def submit_task(self, *, config_id) -> TaskInfo:
         data = self.obi_one_client.launch_task(
             task_type=self._task_type, config_id=config_id
         )
         L.info("Job succefully submitted: %s", data)
+        return TaskInfo.model_validate(data)
+
+    def monitor_task(self, task: TaskInfo, check_mode: str, **kwargs) -> None:
         match check_mode:
             case "stream":
-                self.launch_system_client.pprint_messages(data["job_id"])
+                self.launch_system_client.pprint_messages(task.job_id)
             case "activity":
                 self.db_client.poll_status(
-                    activity_id=data["activity_id"],
+                    activity_id=task.activity_id,
                     activity_type=kwargs["activity_type"],
                 )
             case "job":
                 while True:
-                    job = self.launch_system_client.get_job(data["job_id"])
-                    print(f"STATUS: {job['status']}, LOGS: {job['logs']}")
-                    if job["status"] in {"pending", "running"}:
+                    job = self.launch_system_client.get_job(task.job_id)
+                    print(f"STATUS: {job['status']}")
+                    if logs := job["logs"]:
+                        pprint_messages(logs=logs["stream"])
+                    if job["status"] in {"created", "pending", "running"}:
                         sleep(2)
+                    else:
+                        break
             case "obi-one":
                 while True:
-                    job = self.obi_one_client.get_task(data["job_id"])
-                    print(f"STATUS: {job['status']}, LOGS: {job['logs']}")
-                    if job["status"] in {"pending", "running"}:
+                    job = self.obi_one_client.get_task(task.job_id)
+                    print(f"STATUS: {job['status']}")
+                    if logs := job["logs"]:
+                        pprint_messages(logs=logs["stream"])
+                    if job["status"] in {"created", "pending", "running"}:
                         sleep(2)
+                    else:
+                        break
+
+    def run_task(self, *, config_id, check_mode: str, **kwargs):
+        task = self.submit_task(config_id=config_id)
+        L.info("Task succefully submitted: %s", task)
+        self.monitor_task(task=task, check_mode=check_mode, **kwargs)
 
 
 class OBIClient:
@@ -150,7 +173,9 @@ class OBIClient:
         )
 
     def get_task(self, job_id) -> dict:
-        return self._http_client.get(f"/declared/task/{job_id}").raise_for_status().json()
+        return (
+            self._http_client.get(f"/declared/task/{job_id}").raise_for_status().json()
+        )
 
 
 class LaunchClient:
@@ -195,31 +220,35 @@ class LaunchClient:
                 yield dct
 
     def pprint_messages(self, job_id: str):
-        for dct in self.stream_messages(job_id):
-            match dct["message_type"]:
-                case "stdout":
-                    print(f"[white]STDOUT: {dct['stdout']}[/white]")
-                case "stderr":
-                    print(f"[orange1]STDERR: {dct['stderr']}[/orange1]")
-                case "log":
-                    msg = f"{dct['level']}:{dct['message']}"
-                    match dct["level"]:
-                        case "INFO":
-                            print(f"[dodger_blue1]{msg}[/dodger_blue1]")
-                        case "WARNING":
-                            print(f"[yellow]{msg}[/yellow]")
-                        case "DEBUG":
-                            print(f"[sky_blue1]{msg}[/sky_blue1]")
-                        case "ERROR":
-                            print(f"[red]{msg}[/red]")
-                        case "CRITICAL":
-                            print(f"[bold white on red]{msg}[/bold white on red]")
-                        case _:
-                            print(msg)
-                case "status":
-                    print(f"[magenta]STATUS: {dct['status']}[/magenta]")
-                case _:
-                    print(dct)
+        pprint_logs(self.stream_messages(job_id))
+
+
+def pprint_messages(logs: list[dict]):
+    for dct in logs:
+        match dct["message_type"]:
+            case "stdout":
+                print(f"[white]STDOUT: {dct['stdout']}[/white]")
+            case "stderr":
+                print(f"[orange1]STDERR: {dct['stderr']}[/orange1]")
+            case "log":
+                msg = f"{dct['level']}:{dct['message']}"
+                match dct["level"]:
+                    case "INFO":
+                        print(f"[dodger_blue1]{msg}[/dodger_blue1]")
+                    case "WARNING":
+                        print(f"[yellow]{msg}[/yellow]")
+                    case "DEBUG":
+                        print(f"[sky_blue1]{msg}[/sky_blue1]")
+                    case "ERROR":
+                        print(f"[red]{msg}[/red]")
+                    case "CRITICAL":
+                        print(f"[bold white on red]{msg}[/bold white on red]")
+                    case _:
+                        print(msg)
+            case "status":
+                print(f"[magenta]STATUS: {dct['status']}[/magenta]")
+            case _:
+                print(dct)
 
 
 class DBClient(entitysdk.Client):

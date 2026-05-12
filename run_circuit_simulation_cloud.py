@@ -20,12 +20,12 @@ domains = {
 }
 
 # cell_a
-#CONFIG_ID = "95817298-631a-4c14-a5a4-f0109a632d0f"
-#CONFIG_ID = "24dc0545-d058-4716-ad43-3a588d40a2a1"
+# CONFIG_ID = "95817298-631a-4c14-a5a4-f0109a632d0f"
+# CONFIG_ID = "24dc0545-d058-4716-ad43-3a588d40a2a1"
 CONFIG_ID = "fc19aa7e-6049-49a0-a9ff-cf0fe427e025"
 
 # cell_b
-#CONFIG_ID = "3ff3ead5-1b9b-4d61-8175-3a9868f29dcd"
+# CONFIG_ID = "3ff3ead5-1b9b-4d61-8175-3a9868f29dcd"
 
 OUTPUT_DIR = Path(__file__).parent / "out/circuit_extraction/cloud"
 

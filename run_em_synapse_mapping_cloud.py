@@ -4,7 +4,9 @@ from pathlib import Path
 import obi_one as obi
 from obi_one.types import TaskType
 from entitysdk import models
-from obi_one.scientific.tasks.em_synapse_mapping.config import EMSynapseMappingScanConfig
+from obi_one.scientific.tasks.em_synapse_mapping.config import (
+    EMSynapseMappingScanConfig,
+)
 
 from utils import RemoteTaskManager
 
@@ -16,16 +18,19 @@ L = logging.getLogger(__name__)
 def create_config(manager):
     db_client = manager.db_client
     skeletonized_morphology = db_client.search_entity(
-        entity_type=models.CellMorphology, query={"subject__name": 'IARPA MICrONS mouse'}
+        entity_type=models.CellMorphology,
+        query={"subject__name": "IARPA MICrONS mouse"},
     ).first()
     scan = obi.GridScanGenerationTask(
         form=EMSynapseMappingScanConfig(
             initialize=EMSynapseMappingScanConfig.Initialize(
-                spiny_neuron=obi.CellMorphologyFromID(id_str=str(skeletonized_morphology.id))
+                spiny_neuron=obi.CellMorphologyFromID(
+                    id_str=str(skeletonized_morphology.id)
+                )
             ),
             info=obi.Info(
                 campaign_name="EM Synapse Mapping Single Test",
-                campaign_description="Testing EM Synapse Mapping Single Task"
+                campaign_description="Testing EM Synapse Mapping Single Task",
             ),
         ),
         coordinate_directory_option="ZERO_INDEX",
