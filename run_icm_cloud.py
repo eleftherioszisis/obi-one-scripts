@@ -13,7 +13,7 @@ from obi_one.scientific.blocks.recording import (
 from obi_one.scientific.blocks.stimuli.stimulus import (
     SEClampSomaticStimulus,
 )
-from obi_one.scientific.tasks.generate_simulations.config.ion_channel_models import (
+from obi_one import (
     IonChannelModelSimulationScanConfig,
 )
 from entitysdk import models
@@ -24,7 +24,7 @@ L = logging.getLogger(__name__)
 
 OUTPUT_DIR = Path(__file__).parent / "out/icm/cloud"
 
-# simulation_id = "42b1247e-57d1-4161-8b24-9ddc8af2ed0f"
+#simulation_id = "42b1247e-57d1-4161-8b24-9ddc8af2ed0f"
 
 
 def create_config(manager):
@@ -73,7 +73,7 @@ def create_config(manager):
         timestamps={},
     )
 
-    with open(f"./{output_root}/simulate_ion_channel_scan_config.json", "w") as f:
+    with open(f"{output_root}/simulate_ion_channel_scan_config.json", "w") as f:
         f.write(sim_conf.model_dump_json(indent=4))
 
     # all of the following can be done in the task manager script
@@ -112,11 +112,12 @@ if __name__ == "__main__":
         output_dir=OUTPUT_DIR,
         task_type=TaskType.ion_channel_model_simulation_execution,
         subdomain="cell_a",
-        obi_one_deployment="staging",
+        obi_one_deployment="local",
         launch_system_deployment="staging",
         db_deployment="staging",
     )
 
     config = create_config(manager)
+
     L.info("Config: %s", config)
-    manager.run_task(config_id=config.id)
+    manager.run_task(config_id=config.id, check_mode="obi-one")
