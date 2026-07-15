@@ -138,7 +138,7 @@ class RemoteTaskManager:
                     job = self.launch_system_client.get_job(task.job_id)
                     print(f"STATUS: {job['status']}")
                     if logs := job["logs"]:
-                        pprint_messages(logs=logs["stream"])
+                        print_messages(logs=logs["stream"])
                     if job["status"] in {"created", "pending", "running"}:
                         sleep(2)
                     else:
@@ -148,7 +148,7 @@ class RemoteTaskManager:
                     job = self.obi_one_client.get_task(task.job_id)
                     print(f"STATUS: {job['status']}")
                     if logs := job["logs"]:
-                        pprint_messages(logs=logs["stream"])
+                        print_messages(logs=logs["stream"])
                     if job["status"] in {"created", "pending", "running"}:
                         sleep(2)
                     else:
@@ -220,10 +220,10 @@ class LaunchClient:
                 yield dct
 
     def pprint_messages(self, job_id: str):
-        pprint_logs(self.stream_messages(job_id))
+        print_messages(self.stream_messages(job_id))
 
 
-def pprint_messages(logs: list[dict]):
+def print_messages(logs: list[dict]):
     for dct in logs:
         match dct["message_type"]:
             case "stdout":
