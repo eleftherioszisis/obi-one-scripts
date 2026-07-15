@@ -53,8 +53,14 @@ if __name__ == "__main__":
         obi_one_deployment="staging",
         launch_system_deployment="staging",
         db_deployment="staging",
+        domains={
+            "cell_a": {
+                "virtual_lab_id":
+                "project_id": 
+            }
+        }
     )
-    config = create_config(manager)
+    #config = create_config(manager)
     L.info("Config: %s", config)
     manager.run_task(
         config_id=config.id,

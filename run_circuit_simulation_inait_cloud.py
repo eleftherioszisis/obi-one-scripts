@@ -265,7 +265,7 @@ if __name__ == "__main__":
         output_dir=OUTPUT_DIR,
         task_type=TaskType.circuit_simulation,
         subdomain="cell_a",
-        obi_one_deployment="local",
+        obi_one_deployment="staging",
         launch_system_deployment="staging",
         db_deployment="staging",
         domains=domains,
@@ -276,6 +276,6 @@ if __name__ == "__main__":
 
     manager.run_task(
         config_id=config_id,
-        check_mode="job",
+        check_mode="obi-one",
         activity_type=models.SimulationExecution,
     )

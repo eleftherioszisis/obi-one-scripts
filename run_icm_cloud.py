@@ -24,7 +24,7 @@ L = logging.getLogger(__name__)
 
 OUTPUT_DIR = Path(__file__).parent / "out/icm/cloud"
 
-#simulation_id = "42b1247e-57d1-4161-8b24-9ddc8af2ed0f"
+simulation_id = "42b1247e-57d1-4161-8b24-9ddc8af2ed0f"
 
 
 def create_config(manager):
@@ -117,7 +117,7 @@ if __name__ == "__main__":
         db_deployment="staging",
     )
 
-    config = create_config(manager)
+    #config = create_config(manager)
 
-    L.info("Config: %s", config)
-    manager.run_task(config_id=config.id, check_mode="obi-one")
+    #L.info("Config: %s", config)
+    manager.run_task(config_id=simulation_id, check_mode="obi-one")
