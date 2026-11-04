@@ -17,6 +17,8 @@ SCRIPTS = {
     "run_circuit_simulation_cloud": ROOT / "run_circuit_simulation_cloud.py",
     "run_circuit_extraction_cloud": ROOT / "run_circuit_extraction_cloud.py",
     "run_skeletonization_cloud": ROOT / "run_skeletonization_cloud.py",
+    "run_extracellular_recording_weights_calculation_cloud": ROOT
+    / "run_extracellular_recording_weights_calculation_cloud.py",
 }
 
 
@@ -193,7 +195,8 @@ const SCRIPT_ORDER = [
   "run_icm_cloud",
   "run_circuit_simulation_cloud",
   "run_circuit_extraction_cloud",
-  "run_skeletonization_cloud"
+  "run_skeletonization_cloud",
+  "run_extracellular_recording_weights_calculation_cloud",
 ];
 
 function esc(text) {

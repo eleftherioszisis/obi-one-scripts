@@ -60,6 +60,7 @@ class RemoteTaskManager:
         launch_system_deployment,
         db_deployment,
         domains=DEFAULT_DOMAINS,
+        token=None,
     ):
         data = domains[subdomain]
         self._virtual_lab_id = data["virtual_lab_id"]
@@ -67,7 +68,7 @@ class RemoteTaskManager:
 
         # from the platform, needed for auth-manager dependent services
         # like launch_system / obi_one
-        self._token = os.environ["ACCESS_TOKEN"]
+        self._token = token if token else os.environ["ACCESS_TOKEN"]
 
         # from obi_auth, for long lasting operations as it refreshes the token
         self._token_manager = TokenFromFunction(

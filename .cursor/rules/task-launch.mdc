@@ -1,0 +1,22 @@
+---
+description: How to launch OBI tasks (obi-one local + tunnel + run_*.py). Read AGENTS.md for full guide.
+alwaysApply: true
+---
+
+# OBI task launch (obi-one-scripts)
+
+Full guide: [AGENTS.md](../../AGENTS.md)
+
+When running or debugging `run_*.py` scripts, use **three long-lived processes**:
+
+1. **Terminal 1** — `cd ../obi-one && make run-local` → http://127.0.0.1:8100
+2. **Terminal 2** — `./tunnel.sh` → https://127.0.0.1:4444 (launch-system)
+3. **Terminal 3** — `export ACCESS_TOKEN='…'` then `../obi-one/.venv/bin/python run_<task>.py`
+
+Requirements:
+- User must provide `ACCESS_TOKEN` (never commit it).
+- Use `RemoteTaskManager` with `obi_one_deployment="local"`, `launch_system_deployment="staging"`, `db_deployment="staging"`.
+- Python: `../obi-one/.venv/bin/python`; install `rich` in that venv if needed.
+- On failure, fetch full job logs via obi-one `/declared/task/{job_id}` using `obi_auth.get_token`.
+
+New scripts: copy pattern from existing `run_*.py`, build `ScanConfig` from obi-one examples, launch with matching `TaskType`.

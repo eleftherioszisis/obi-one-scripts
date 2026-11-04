@@ -6,10 +6,10 @@ import obi_one as obi
 from obi_one.core.info import Info
 from obi_one.types import TaskType
 from obi_one.scientific.from_id.ion_channel_model_from_id import IonChannelModelFromID
-from obi_one.scientific.blocks.ion_channel_model import IonChannelModelWithConductance
-from obi_one.scientific.blocks.recording import (
-    SomaVoltageRecording,
+from obi_one.scientific.blocks.ion_channel_model.ion_channel_model import (
+    IonChannelModelWithConductance,
 )
+from obi_one.scientific.blocks.recordings.soma import SomaVoltageRecording
 from obi_one.scientific.blocks.stimuli.stimulus import (
     SEClampSomaticStimulus,
 )
