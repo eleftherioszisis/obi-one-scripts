@@ -1,11 +1,25 @@
+"""Launch circuit simplification via local obi-one + staging launch-system.
+
+Mirrors ``obi-one/examples/.../circuit_simplification/run_simplification_local.ipynb``
+but submits through ``RemoteTaskManager`` (see AGENTS.md).
+"""
+
+import json
 import logging
+import os
 from pathlib import Path
 
-import obi_one as obi
 from entitysdk import models
+from entitysdk.token_manager import TokenFromFunction
+from obi_one import LAB_ID_STAGING_TEST, PROJECT_ID_STAGING_TEST
 from obi_one.core.info import Info
-from obi_one.scientific.blocks.simplification_algorithms import (
-    SingleCompartmentAlgorithm,
+from obi_one.core.scan_generation import GridScanGenerationTask
+from obi_one.scientific.from_id.circuit_from_id import CircuitFromID
+from obi_one.scientific.tasks.circuit_simplification.algorithms.models import (
+    ALGORITHM_BLOCK_CLASSES,
+)
+from obi_one.scientific.tasks.circuit_simplification.config import (
+    CircuitSimplificationScanConfig,
 )
 from obi_one.types import TaskType
 
@@ -15,27 +29,71 @@ OUTPUT_DIR = Path(__file__).parent / "out/circuit_simplification/cloud"
 
 L = logging.getLogger(__name__)
 
-# From run_simplification_local.ipynb (paired neuron, staging)
+# From run_simplification_local.ipynb / prior cloud script (paired neuron, staging)
 CIRCUIT_ID = "ed096991-4171-4cfc-b54e-756323fc62e7"
+ALGORITHM = "single_compartment"
+
+# Set to relaunch without create_config()
+CONFIG_ID: str | None = None
+
+DOMAINS = {
+    "cell_a": {
+        "virtual_lab_id": LAB_ID_STAGING_TEST,
+        "project_id": PROJECT_ID_STAGING_TEST,
+    }
+}
+
+
+def _entity_row(entity) -> dict:
+    row = {
+        "type": type(entity).__name__,
+        "id": str(entity.id),
+        "name": getattr(entity, "name", None),
+        "description": getattr(entity, "description", None),
+    }
+    for attr in (
+        "target_simulator",
+        "number_neurons",
+        "number_synapses",
+        "lifecycle_status",
+        "atlas_release",
+    ):
+        if (value := getattr(entity, attr, None)) is not None:
+            row[attr] = str(value)
+    if parent := getattr(entity, "parent", None):
+        row["parent_id"] = str(getattr(parent, "id", parent))
+    if assets := getattr(entity, "assets", None):
+        row["assets"] = sorted(f"{a.label}:{a.path}" for a in assets)
+    return row
 
 
 def create_config(manager):
     db_client = manager.db_client
 
-    scan_config = obi.CircuitSimplificationScanConfig(
+    input_circuit = db_client.get_entity(
+        entity_id=CIRCUIT_ID, entity_type=models.Circuit
+    )
+    L.info("Input circuit: %s", json.dumps(_entity_row(input_circuit), indent=2))
+
+    if ALGORITHM not in ALGORITHM_BLOCK_CLASSES:
+        raise ValueError(
+            f"Unknown algorithm {ALGORITHM!r}; choose from {sorted(ALGORITHM_BLOCK_CLASSES)}"
+        )
+
+    scan_config = CircuitSimplificationScanConfig(
         info=Info(
             campaign_name="Circuit Simplification Test",
-            campaign_description="Testing circuit simplification",
+            campaign_description=(
+                f"Testing circuit simplification ({ALGORITHM}) via local obi-one"
+            ),
         ),
-        initialize=obi.CircuitSimplificationScanConfig.Initialize(
-            circuit=obi.CircuitFromID(id_str=CIRCUIT_ID),
+        initialize=CircuitSimplificationScanConfig.Initialize(
+            circuit=CircuitFromID(id_str=CIRCUIT_ID),
         ),
-        algorithms={
-            "single_compartment": SingleCompartmentAlgorithm(),
-        },
+        algorithm=ALGORITHM_BLOCK_CLASSES[ALGORITHM](),
     )
 
-    grid_scan = obi.GridScanGenerationTask(
+    grid_scan = GridScanGenerationTask(
         form=scan_config,
         coordinate_directory_option="ZERO_INDEX",
         output_root=manager.output_dir,
@@ -58,11 +116,90 @@ def create_config(manager):
             cfg.single_entity.id,
         )
 
-    return grid_scan.single_configs[0].single_entity
+    summary = {
+        "input_circuit": _entity_row(input_circuit),
+        "campaign": _entity_row(campaign_entity),
+        "config": _entity_row(grid_scan.single_configs[0].single_entity),
+        "algorithm": ALGORITHM,
+    }
+    (manager.output_dir / "pre_launch_summary.json").write_text(
+        json.dumps(summary, indent=2, default=str)
+    )
+    return grid_scan.single_configs[0].single_entity, summary
+
+
+def report_results(manager, config_id, summary: dict) -> dict:
+    """Fetch execution activity + generated simplified circuit after the job finishes."""
+    db_client = manager.db_client
+    activities = list(
+        db_client.search_entity(
+            entity_type=models.TaskActivity,
+            query={"used__id": str(config_id)},
+        )
+    )
+    if not activities:
+        L.warning("No TaskActivity found for config %s", config_id)
+        summary["activities"] = []
+        return summary
+
+    # Prefer the newest activity
+    activities = sorted(activities, key=lambda a: a.start_time or "", reverse=True)
+    activity_rows = []
+    generated_circuits = []
+    for activity in activities:
+        row = {
+            "type": type(activity).__name__,
+            "id": str(activity.id),
+            "status": str(getattr(activity, "status", None)),
+            "used": [f"{type(u).__name__}:{u.id}" for u in activity.used or []],
+            "generated": [
+                f"{type(g).__name__}:{g.id}" for g in activity.generated or []
+            ],
+        }
+        activity_rows.append(row)
+        for gen in activity.generated or []:
+            try:
+                circuit = db_client.get_entity(
+                    entity_id=gen.id, entity_type=models.Circuit
+                )
+                generated_circuits.append(_entity_row(circuit))
+            except Exception as exc:  # noqa: BLE001 - best-effort reporting
+                generated_circuits.append(
+                    {"id": str(gen.id), "error": f"{type(exc).__name__}: {exc}"}
+                )
+
+    summary["activities"] = activity_rows
+    summary["simplified_circuits"] = generated_circuits
+    (manager.output_dir / "post_launch_summary.json").write_text(
+        json.dumps(summary, indent=2, default=str)
+    )
+
+    print("\n" + "=" * 80 + "\nSIMPLIFICATION SUMMARY\n" + "=" * 80)
+    print(f"\n[algorithm]\n  {ALGORITHM}")
+    print("\n[before / input_circuit]")
+    for k, v in summary.get("input_circuit", {}).items():
+        print(f"  {k}: {v}")
+    print("\n[after / simplified_circuits]")
+    if generated_circuits:
+        for circuit in generated_circuits:
+            for k, v in circuit.items():
+                print(f"  {k}: {v}")
+            print()
+    else:
+        print("  (none found on TaskActivity.generated)")
+    print("[activities]")
+    for row in activity_rows:
+        for k, v in row.items():
+            print(f"  {k}: {v}")
+        print()
+    return summary
 
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
+
+    if "ACCESS_TOKEN" not in os.environ:
+        raise SystemExit("ACCESS_TOKEN must be set in the environment")
 
     manager = RemoteTaskManager(
         output_dir=OUTPUT_DIR,
@@ -71,11 +208,28 @@ if __name__ == "__main__":
         obi_one_deployment="local",
         launch_system_deployment="staging",
         db_deployment="staging",
+        domains=DOMAINS,
     )
-    config = create_config(manager)
-    L.info("Config: %s", config)
+    # Prefer the platform bearer for entitycore / launch-system when browser
+    # obi_auth login is unavailable in this session.
+    manager._token_manager = TokenFromFunction(lambda: os.environ["ACCESS_TOKEN"])
+
+    summary: dict = {"algorithm": ALGORITHM}
+    if CONFIG_ID is None:
+        config, summary = create_config(manager)
+        config_id = config.id
+        L.info("Config: %s", config)
+    else:
+        config_id = CONFIG_ID
+        input_circuit = manager.db_client.get_entity(
+            entity_id=CIRCUIT_ID, entity_type=models.Circuit
+        )
+        summary["input_circuit"] = _entity_row(input_circuit)
+        L.info("Using existing config_id: %s", config_id)
+
     manager.run_task(
-        config_id=config.id,
+        config_id=config_id,
         activity_type=models.TaskActivity,
         check_mode="obi-one",
     )
+    report_results(manager, config_id, summary)
