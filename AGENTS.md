@@ -178,6 +178,21 @@ manager.run_task(config_id=CONFIG_ID, check_mode="obi-one", ...)
 
 Example reference: [run_circuit_simplification.py](run_circuit_simplification.py) (from `run_simplification_local.ipynb`).
 
+## Testing an obi-one branch in the cloud
+
+The worker clones obi-one at the `ref` the service submits (`tag:<release>` by default) and installs the task's `dependencies/*.txt`, whose obi-one line pins the last release wheel. To run a branch:
+
+1. On a throwaway branch off the feature branch, change the obi-one line of each task's `*.txt` you need (e.g. `nest_image.txt`, `circuit_simplification.txt`) to `obi-one[<extras>] @ git+https://github.com/openbraininstitute/obi-one.git@<feature sha>`, commit and push. Never push this edit to the PR branch.
+2. Serve obi-one on :8101 so jobs are submitted with `ref=commit:<throwaway sha>`:
+   ```bash
+   cd ../obi-one
+   bash -c 'set -a; source .env.run-local 2>/dev/null; set +a; PYTHONPATH=. OBI_ONE_LAUNCH_COMMIT=<40-hex sha> exec .venv/bin/python ../obi-one-scripts/serve_obi_one_branch.py'
+   ```
+   Add `--check` to print the ref of every task type and exit.
+3. Run a `*_branch.py` script (they read `OBI_ONE_URL`, default `http://127.0.0.1:8101`).
+
+Example: [run_circuit_simulation_nest_branch.py](run_circuit_simulation_nest_branch.py) (NEST simplification + simulation + result checks).
+
 ## Fetching full job logs after failure
 
 Poll obi-one (preferred when using local deployment):
